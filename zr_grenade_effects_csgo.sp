@@ -2,11 +2,11 @@
 
 #include <sourcemod>
 #include <sdktools>
-//#include <sdkhooks>
+#include <sdkhooks>
 
 #include <zombiereloaded>
 
-#define PLUGIN_VERSION "2.2 CSGO fix by Franc1sco franug"
+#define PLUGIN_VERSION "2.3 CSGO fix by Franc1sco franug"
 
 #define FLASH 0
 #define SMOKE 1
@@ -39,7 +39,8 @@ new Handle:h_freeze_timer[MAXPLAYERS+1];
 new Handle:h_fwdOnClientFreeze,
 	Handle:h_fwdOnClientFreezed,
 	Handle:h_fwdOnClientIgnite,
-	Handle:h_fwdOnClientIgnited;
+	Handle:h_fwdOnClientIgnited,
+	Handle:h_fwdOnGrenadeEffect;
 
 public Plugin:myinfo = 
 {
@@ -56,6 +57,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 	h_fwdOnClientFreezed = CreateGlobalForward("ZR_OnClientFreezed", ET_Ignore, Param_Cell, Param_Cell, Param_Float);
 	
 	h_fwdOnClientIgnite = CreateGlobalForward("ZR_OnClientIgnite", ET_Hook, Param_Cell, Param_Cell, Param_FloatByRef);
+	h_fwdOnGrenadeEffect = CreateGlobalForward("ZR_OnGrenadeEffect", ET_Hook, Param_Cell, Param_Cell);
 	h_fwdOnClientIgnited = CreateGlobalForward("ZR_OnClientIgnited", ET_Ignore, Param_Cell, Param_Cell, Param_Float);
 	
 	return APLRes_Success;
@@ -63,7 +65,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
 
 public OnPluginStart()
 {
-	CreateConVar("zr_csgogreneffect_version", PLUGIN_VERSION, "The plugin's version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_CHEAT|FCVAR_DONTRECORD);
+	CreateConVar("zr_csgogreneffect_version", PLUGIN_VERSION, "The plugin's version", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_CHEAT|FCVAR_DONTRECORD);
 	
 	h_greneffects_enable = CreateConVar("zr_greneffect_enable", "1", "Enables/Disables the plugin", 0, true, 0.0, true, 1.0);
 	h_greneffects_trails = CreateConVar("zr_greneffect_trails", "1", "Enables/Disables Grenade Trails", 0, true, 0.0, true, 1.0);
@@ -388,10 +390,33 @@ public Action:Unfreeze(Handle:timer, any:client)
 
 public OnEntityCreated(entity, const String:classname[])
 {
+	if(StrContains(classname, "_projectile") != -1) SDKHook(entity, SDKHook_SpawnPost, Grenade_SpawnPost);
+	
+}
+
+public Grenade_SpawnPost(entity)
+{
+	new client = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
+	if (client == -1)return;
+	
+	new Action:result;
+	result = Forward_OnGrenadeEffect(client, entity);
+	
+	switch (result)
+	{
+		case Plugin_Handled, Plugin_Stop:
+		{
+			return;
+		}
+	}
+	
 	if (!b_enable)
 	{
 		return;
 	}
+	
+	char classname[64];
+	GetEdictClassname(entity, classname, 64);
 	
 	if (!strcmp(classname, "hegrenade_projectile"))
 	{
@@ -424,11 +449,6 @@ public OnEntityCreated(entity, const String:classname[])
 		new iReference = EntIndexToEntRef(entity);
 		CreateTimer(0.1, Timer_OnGrenadeCreated, iReference);
 	}
-	else if (b_smoke_freeze && !strcmp(classname, "env_particlesmokegrenade"))
-	{
-		AcceptEntityInput(entity, "Kill");
-	}
-	//PrintToChatAll("Entidad creada: %s", classname);
 }
 
 public Action:Timer_OnGrenadeCreated(Handle:timer, any:ref)
@@ -524,6 +544,19 @@ public Action:NormalSHook(clients[64], &numClients, String:sample[PLATFORM_MAX_P
 		F O R W A R D S
 	------------------------------------------------
 */
+
+Action:Forward_OnGrenadeEffect(client, entity)
+{
+	decl Action:result;
+	result = Plugin_Continue;
+	
+	Call_StartForward(h_fwdOnGrenadeEffect);
+	Call_PushCell(client);
+	Call_PushCell(entity);
+	Call_Finish(result);
+	
+	return result;
+}
 
 Action:Forward_OnClientFreeze(client, attacker, &Float:time)
 {
