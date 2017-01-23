@@ -396,7 +396,7 @@ public OnEntityCreated(entity, const String:classname[])
 
 public Grenade_SpawnPost(entity)
 {
-	new client = GetEntPropEnt(entity, Prop_Send, "m_hThrower");
+	new client = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 	if (client == -1)return;
 	
 	new Action:result;
