@@ -6,7 +6,7 @@
 
 #include <zombiereloaded>
 
-#define PLUGIN_VERSION "2.3 CSGO fix by Franc1sco franug"
+#define PLUGIN_VERSION "2.3.1 CSGO fix by Franc1sco franug"
 
 #define FLASH 0
 #define SMOKE 1
